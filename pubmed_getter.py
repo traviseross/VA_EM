@@ -8,8 +8,11 @@ import math
 import pymed
 import metapub
 fetch = metapub.PubMedFetcher()
-api_key=input("Enter your API key: ")
-queries=[]
+api_key='6e902c74ef429caa9b724d4796a2883c3408'#input("Enter your API key: ")
+queries=[
+	"%22Emergency%20Medicine%22%5BMESH%5D%20OR%20%28%28%28%28%28%28%28%22The%20American%20journal%20of%20emergency%20medicine%22%5BJournal%5D%29%20OR%20%28%22Annals%20of%20emergency%20medicine%22%5BJournal%5D%29%29%20OR%20%28%22The%20Journal%20of%20emergency%20medicine%22%5BJournal%5D%29%29%20OR%20%28%22Academic%20emergency%20medicine%20%3A%20official%20journal%20of%20the%20Society%20for%20Academic%20Emergency%20Medicine%22%5BJournal%5D%29%29%20OR%20%28%22Pediatric%20emergency%20care%22%5BJournal%5D%29%29",
+	"VA+Hospital%5BAffiliation%5D+OR+VA+Medical%5BAffiliation%5D+OR+VA+Health%5BAffiliation%5D+OR+VA+Healthcare%5BAffiliation%5D+OR+VAMC%5BAffiliation%5D+OR+Veterans%5BAffiliation%5D+OR+VHA%5BAffiliation%5D+OR+%40va.gov%5BAffiliation%5D"
+]
 
 def parse_pmid(id):
 	article = fetch.article_by_pmid(id)
@@ -26,7 +29,6 @@ def parse_pmid(id):
 		pass
 	try:
 		if isinstance(article.authors, list):
-			print(article.authors)
 			for idx,author in enumerate(article.authors):
 				dict_out[f'auth_{idx}']=author
 		elif isinstance(article.authors, str):
@@ -56,18 +58,24 @@ def parse_pmid(id):
 def pmid_getter(query):
 	ids=[]
 	n=1
+	url=f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={query}&{api_key}&rettype=uilist&retmode=xml&mindate=1980&maxdate=2020&retmax=10000"
+	r=requests.post(url)
+	soup=bs(r.content,features="lxml")
+	try:
+		count=int(soup.find('count').text)
+		n=math.ceil(count/10000+.5)
+		print(count,n)
+	except Exception as e:
+		print(f'error on count: {e}')
 	for i in range(n):
 		start=i*10000
 		url=f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={query}&{api_key}&rettype=uilist&retmode=xml&mindate=1980&maxdate=2020&retmax=10000&retstart={start}"
 		r=requests.post(url)
 		soup=bs(r.content,features="lxml")
-		if n==1:
-			n=math.ceil(int(soup.find('count').text)/10000+.5)
-		else:
-			pass
 		ids=ids+[id.text for id in soup.find_all('id')]
 		ids=list(set(ids))
 	return(ids)
+
 def pmid_searcher(queries):
 	id_lists=[]
 	for i in range(len(queries)):
@@ -78,13 +86,15 @@ def pmid_searcher(queries):
 		f.close()
 		id_lists.append(ids)
 	return(id_lists)
-search='go on'
-while search != 'n':
-	search=input("More queries? 'n' to stop\n")
-	if search == 'n':
-		pass
-	else:
-		queries.append(search)
+
+if queries==[]:
+	search='go on'
+	while search != 'n':
+		search=input("More queries? 'n' to stop\n")
+		if search == 'n':
+			pass
+		else:
+			queries.append(search)
 id_lists=pmid_searcher(queries)
 for i in range(len(id_lists)):
 	ids_to_check=id_lists[i]
