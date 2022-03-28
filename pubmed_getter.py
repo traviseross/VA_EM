@@ -28,9 +28,23 @@ def parse_pmid(id):
 		print(f'error on year: {e}')
 		pass
 	try:
+		dict_out['auth_count']=len(article.authors)
+	except Exception as e:
+		print(f'error on year: {e}')
+		pass
+	try:
 		if isinstance(article.authors, list):
-			for idx,author in enumerate(article.authors):
-				dict_out[f'auth_{idx}']=author
+			if len(article.authors)>10:
+				i=0
+				for author in article.authors[:10]:
+					dict_out[f'auth_{i}']=author
+					i+=1
+				dict_out['auth_additional']=article.authors[10:]
+			elif len(article.authors)<11:
+				for idx,author in enumerate(article.authors):
+					dict_out[f'auth_{idx}']=author
+			else:
+				dict_out['authors']=article.authors
 		elif isinstance(article.authors, str):
 			dict_out['auth_0']=article.authors
 		else:
@@ -66,7 +80,17 @@ def pmid_getter(query):
 		n=math.ceil(count/10000+.5)
 		print(count,n)
 	except Exception as e:
-		print(f'error on count: {e}')
+		print(f'error on count: {e}, trying again')
+		r=requests.post(url)
+		sleep(1)
+		soup=bs(r.content,features="lxml")
+		try:
+			count=int(soup.find('count').text)
+			n=math.ceil(count/10000+.5)
+			print(count,n)
+		except Exception as e:
+			print(f'error on count: {e}, giving up')
+			n=25
 	for i in range(n):
 		start=i*10000
 		url=f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={query}&{api_key}&rettype=uilist&retmode=xml&mindate=1980&maxdate=2020&retmax=10000&retstart={start}"
@@ -109,7 +133,8 @@ for i in range(len(id_lists)):
 			print(f'error on {id}: {e}')
 			dict_list.append({'pmid':id})
 			pass
-	column_names=set().union(*(d.keys() for d in dict_list))
+	column_names=list(set().union(*(d.keys() for d in dict_list)))
+	column_names.sort()
 	print(column_names)
 	df=pd.DataFrame(dict_list,columns=column_names)
 	print(df)
